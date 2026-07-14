@@ -1,21 +1,48 @@
 "use client";
 
-import { Card, CardContent, Button, Spinner } from "@heroui/react";
+import {
+  Alert,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  EmptyState,
+  Spinner,
+} from "@heroui/react";
 import { Plus, Trash2 } from "lucide-react";
 import { useAccounts } from "@/hooks/use-accounts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export function AccountList() {
   const { data: accounts, isLoading } = useAccounts();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const [banner, setBanner] = useState<{
+    type: "success" | "danger";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("success") === "connected") {
+      setBanner({ type: "success", text: "X account connected successfully." });
+    } else if (searchParams.get("error")) {
+      setBanner({
+        type: "danger",
+        text: `Connection failed: ${searchParams.get("error")}`,
+      });
+    }
+  }, [searchParams]);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/accounts", { method: "POST" });
-      if (!response.ok) throw new Error("Failed to initiate connection");
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to start OAuth");
       window.location.href = data.data.authUrl;
     },
+    onError: (err: Error) => setBanner({ type: "danger", text: err.message }),
   });
 
   const disconnectMutation = useMutation({
@@ -33,77 +60,109 @@ export function AccountList() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="flex justify-center py-16">
         <Spinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">Connected Accounts</h2>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
+          <p className="mt-1 text-sm text-muted">
+            Connect X profiles via OAuth 2.0 PKCE. Tokens encrypted at rest.
+          </p>
+        </div>
         <Button
-          variant="primary"
-          onClick={() => connectMutation.mutate()}
-          isDisabled={connectMutation.isPending}
+          className="btn-glow"
+          isPending={connectMutation.isPending}
+          onPress={() => connectMutation.mutate()}
         >
-          <Plus size={16} className="mr-1" />
-          Connect X Account
+          {({ isPending }) => (
+            <>
+              {isPending ? <Spinner size="sm" color="current" /> : <Plus size={15} />}
+              Connect X account
+            </>
+          )}
         </Button>
       </div>
 
+      {banner && (
+        <Alert status={banner.type}>
+          <Alert.Content>
+            <Alert.Description>{banner.text}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+
       {!accounts || accounts.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <p className="text-default-500 mb-4">No connected accounts yet</p>
-            <Button
-              variant="primary"
-              onClick={() => connectMutation.mutate()}
-            >
-              Connect Your First Account
-            </Button>
-          </CardContent>
+        <Card className="card-premium">
+          <Card.Content className="px-5 py-10">
+            <EmptyState className="mx-auto max-w-sm text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-accent">
+                <Plus size={20} />
+              </div>
+              <p className="font-medium">No connected accounts</p>
+              <p className="mt-2 text-sm text-muted">
+                Connect an X account with tweet write scopes to start publishing.
+              </p>
+              <Button
+                className="btn-glow mt-5"
+                onPress={() => connectMutation.mutate()}
+              >
+                <Plus size={15} />
+                Connect your first account
+              </Button>
+            </EmptyState>
+          </Card.Content>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {accounts.map((account: any) => (
-            <Card key={account.id}>
-              <CardContent className="flex flex-row items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-sm font-medium text-primary">
-                    {account.username[0].toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold">@{account.username}</p>
-                  {account.displayName && (
-                    <p className="text-sm text-default-500">
-                      {account.displayName}
-                    </p>
-                  )}
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    account.isActive
-                      ? "bg-success/20 text-success"
-                      : "bg-danger/20 text-danger"
-                  }`}
-                >
-                  {account.isActive ? "Active" : "Inactive"}
-                </span>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  isIconOnly
-                  onClick={() => disconnectMutation.mutate(account.id)}
-                  isDisabled={disconnectMutation.isPending}
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-3 md:grid-cols-2">
+          {accounts.map(
+            (account: {
+              id: string;
+              username: string;
+              displayName?: string | null;
+              avatar?: string | null;
+              isActive: boolean;
+            }) => (
+              <Card key={account.id} className="card-premium">
+                <Card.Content className="flex flex-row items-center gap-4 p-4">
+                  <Avatar>
+                    {account.avatar ? (
+                      <Avatar.Image src={account.avatar} alt="" />
+                    ) : null}
+                    <Avatar.Fallback>
+                      {account.username[0]?.toUpperCase()}
+                    </Avatar.Fallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">@{account.username}</p>
+                    {account.displayName && (
+                      <p className="truncate text-sm text-muted">
+                        {account.displayName}
+                      </p>
+                    )}
+                  </div>
+                  <Chip color="success" variant="soft" size="sm">
+                    Active
+                  </Chip>
+                  <Button
+                    size="sm"
+                    variant="danger-soft"
+                    isIconOnly
+                    aria-label="Disconnect"
+                    isPending={disconnectMutation.isPending}
+                    onPress={() => disconnectMutation.mutate(account.id)}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </Card.Content>
+              </Card>
+            )
+          )}
         </div>
       )}
     </div>

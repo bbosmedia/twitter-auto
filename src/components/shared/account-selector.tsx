@@ -1,88 +1,128 @@
 "use client";
 
-import { Button } from "@heroui/react";
-import { Check } from "lucide-react";
-import { cn } from "@/utils/cn";
+import {
+  Avatar,
+  Button,
+  Description,
+  FieldError,
+  Label,
+  ListBox,
+  Select,
+} from "@heroui/react";
+import Link from "next/link";
 
-interface Account {
+export type SelectableAccount = {
   id: string;
   username: string;
-  displayName: string | null;
-  avatar: string | null;
-  isActive: boolean;
-}
-
-interface AccountSelectorProps {
-  accounts: Account[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-}
+  displayName?: string | null;
+  avatar?: string | null;
+  isActive?: boolean;
+};
 
 export function AccountSelector({
   accounts,
   selected,
   onChange,
-}: AccountSelectorProps) {
-  const toggleAccount = (accountId: string) => {
-    if (selected.includes(accountId)) {
-      onChange(selected.filter((id) => id !== accountId));
-    } else {
-      onChange([...selected, accountId]);
-    }
-  };
-
-  const selectAll = () => {
-    if (selected.length === accounts.length) {
-      onChange([]);
-    } else {
-      onChange(accounts.map((a) => a.id));
-    }
-  };
-
-  if (accounts.length === 0) {
+  isInvalid,
+  errorMessage,
+}: {
+  accounts: SelectableAccount[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  isInvalid?: boolean;
+  errorMessage?: string;
+}) {
+  if (!accounts.length) {
     return (
-      <div className="text-center py-4 text-default-500">
-        No connected accounts.{" "}
-        <a href="/accounts" className="text-primary underline">
+      <div className="rounded-xl border border-dashed border-border bg-surface/40 px-4 py-6 text-center text-sm text-muted">
+        No active X accounts.{" "}
+        <Link href="/accounts" className="text-accent hover:underline">
           Connect one
-        </a>
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Post to:</span>
-        <Button size="sm" variant="ghost" onClick={selectAll}>
-          {selected.length === accounts.length ? "Deselect All" : "Select All"}
-        </Button>
-      </div>
+      <Select
+        fullWidth
+        selectionMode="multiple"
+        placeholder="Select accounts to publish"
+        value={selected}
+        onChange={(keys) => {
+          const list = Array.isArray(keys) ? keys : keys != null ? [keys] : [];
+          onChange(list.map(String));
+        }}
+        isInvalid={isInvalid}
+        variant="secondary"
+        className="form-field w-full"
+      >
+        <Label>Publish to</Label>
+        <Select.Trigger>
+          <Select.Value>
+            {({ defaultChildren, isPlaceholder, state }) => {
+              if (isPlaceholder || state.selectedItems.length === 0) {
+                return defaultChildren;
+              }
+              if (state.selectedItems.length === 1) {
+                const acc = accounts.find(
+                  (a) => a.id === String(state.selectedItems[0]?.key)
+                );
+                return acc ? `@${acc.username}` : defaultChildren;
+              }
+              return `${state.selectedItems.length} accounts selected`;
+            }}
+          </Select.Value>
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox selectionMode="multiple">
+            {accounts.map((account) => (
+              <ListBox.Item
+                key={account.id}
+                id={account.id}
+                textValue={`@${account.username} ${account.displayName || ""}`}
+              >
+                <Avatar size="sm">
+                  {account.avatar ? (
+                    <Avatar.Image src={account.avatar} alt="" />
+                  ) : null}
+                  <Avatar.Fallback>
+                    {account.username[0]?.toUpperCase()}
+                  </Avatar.Fallback>
+                </Avatar>
+                <div className="flex min-w-0 flex-col">
+                  <Label>@{account.username}</Label>
+                  {account.displayName ? (
+                    <Description>{account.displayName}</Description>
+                  ) : null}
+                </div>
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </Select.Popover>
+        {isInvalid && errorMessage ? (
+          <FieldError>{errorMessage}</FieldError>
+        ) : (
+          <Description>
+            Post to one or many connected X profiles at once.
+          </Description>
+        )}
+      </Select>
+
       <div className="flex flex-wrap gap-2">
-        {accounts.map((account) => {
-          const isSelected = selected.includes(account.id);
-          return (
-            <button
-              key={account.id}
-              type="button"
-              onClick={() => !account.isActive || toggleAccount(account.id)}
-              disabled={!account.isActive}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-all",
-                isSelected
-                  ? "bg-primary text-white border-primary"
-                  : "bg-transparent border-default-300 hover:border-primary",
-                !account.isActive && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <div className="w-5 h-5 rounded-full bg-default-200 flex items-center justify-center text-xs font-medium">
-                {account.username[0].toUpperCase()}
-              </div>
-              @{account.username}
-              {isSelected && <Check size={14} />}
-            </button>
-          );
-        })}
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => onChange(accounts.map((a) => a.id))}
+        >
+          Select all
+        </Button>
+        <Button size="sm" variant="ghost" onPress={() => onChange([])}>
+          Clear
+        </Button>
       </div>
     </div>
   );

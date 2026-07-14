@@ -1,26 +1,21 @@
-"use client";
+import { Chip } from "@heroui/react";
 
-interface CharCounterProps {
+export function CharCounter({
+  current,
+  max = 280,
+}: {
   current: number;
-  max: number;
-}
-
-export function CharCounter({ current, max }: CharCounterProps) {
+  max?: number;
+}) {
   const remaining = max - current;
-  const isOver = remaining < 0;
-  const isWarning = remaining <= 20 && remaining > 0;
+  const color =
+    remaining < 0 ? "danger" : remaining <= 20 ? "warning" : "default";
 
   return (
-    <span
-      className={`text-sm px-2 py-0.5 rounded-full ${
-        isOver
-          ? "bg-danger/20 text-danger"
-          : isWarning
-            ? "bg-warning/20 text-warning"
-            : "bg-default-200 text-default-600"
-      }`}
-    >
-      {remaining} remaining
-    </span>
+    <Chip size="sm" color={color} variant="soft">
+      <Chip.Label className="tabular-nums font-medium">
+        {current}/{max}
+      </Chip.Label>
+    </Chip>
   );
 }

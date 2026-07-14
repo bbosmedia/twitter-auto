@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pulse — X Multi-Account Post Scheduler
 
-## Getting Started
+Professional full-stack X (Twitter) post scheduler. Multi-account OAuth, compose / schedule / drafts / templates, BullMQ workers, encrypted tokens. **No subscription** — the entire product is included.
 
-First, run the development server:
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Runtime | Bun / Node |
+| App | Next.js 16 (App Router + `proxy.ts`) |
+| UI | React 19, Tailwind CSS v4, HeroUI |
+| Auth | Better Auth (Google + X only) |
+| DB | PostgreSQL + Drizzle ORM |
+| Jobs | BullMQ + Redis |
+| Validation | Zod + React Hook Form |
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Infrastructure
+docker compose up -d
+
+# 2. Environment
+cp .env.example .env.local
+# Set BETTER_AUTH_SECRET, ENCRYPTION_KEY (64 hex chars), and optional X/Google keys
+
+# 3. Install & migrate
+bun install
+bun run db:generate
+bun run db:migrate
+
+# 4. App + worker (two terminals)
+bun run dev
+bun run worker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Generate secrets
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# BETTER_AUTH_SECRET
+openssl rand -base64 32
 
-## Learn More
+# ENCRYPTION_KEY (64 hex chars)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-To learn more about Next.js, take a look at the following resources:
+## X developer setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Create an app at [developer.x.com](https://developer.x.com/en/portal/dashboard)
+2. Enable **OAuth 2.0** with PKCE
+3. Callback URLs:
+   - App login: `http://localhost:3000/api/auth/callback/twitter`
+   - Account connect: `http://localhost:3000/api/twitter/callback`
+4. Scopes: `tweet.read tweet.write users.read offline.access`
+5. Set `X_CLIENT_ID`, `X_CLIENT_SECRET`, `X_REDIRECT_URI` in `.env.local`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> Posting requires a paid X API tier that allows write access.
 
-## Deploy on Vercel
+## Features
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Google + X (Twitter) social sign-in only (no email/password)
+- Light premium dashboard
+- Connect multiple X accounts (separate PKCE flow)
+- Compose → Post now / Schedule / Save draft
+- Queue with retry for failed publishes
+- Templates
+- AES-256-GCM encryption for OAuth tokens
+- Background publish worker + 1-minute scheduler tick
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `bun run dev` | Next.js dev server |
+| `bun run worker` | BullMQ workers |
+| `bun run db:generate` | Generate migrations |
+| `bun run db:migrate` | Apply migrations |
+| `bun run db:studio` | Drizzle Studio |
+| `bun run build` | Production build |
+
+## Architecture
+
+```
+Browser → Next.js App Router → API routes → Services → Drizzle → PostgreSQL
+                                      ↘ BullMQ → Redis → Workers → X API v2
+```
+
+## License
+
+Private / use as you like for your product.

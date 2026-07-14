@@ -1,0 +1,254 @@
+/*
+ * Tailwind CSS v4 + HeroUI v3
+ * Theme vars must override HeroUI defaults with higher cascade priority.
+ */
+@import "@heroui/styles";
+
+/* ─── Tailwind theme extensions ───────────────────────────────────────────── */
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --color-surface-2: var(--surface-secondary);
+  --color-surface-3: var(--surface-tertiary);
+
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-up: fade-up 0.7s var(--ease-premium) both;
+  --animate-hero-in: hero-in 0.85s var(--ease-premium) both;
+  --animate-float-soft: float-soft 10s ease-in-out infinite;
+}
+
+/* Keyframes outside @theme — more reliable across LightningCSS */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+/*
+ * Brand theme — UNLAYERED so it wins over HeroUI @layer theme defaults.
+ * (Layered @layer base was losing or getting partially rewritten.)
+ */
+:root,
+.light,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --background: #f7f8fb;
+  --foreground: #0f172a;
+
+  --surface: #ffffff;
+  --surface-foreground: #0f172a;
+  --surface-secondary: #f1f5f9;
+  --surface-secondary-foreground: #0f172a;
+  --surface-tertiary: #e8eef6;
+  --surface-tertiary-foreground: #0f172a;
+
+  --overlay: #ffffff;
+  --overlay-foreground: #0f172a;
+
+  --muted: #64748b;
+
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+
+  --default: #eef2f7;
+  --default-foreground: #0f172a;
+
+  --border: #e2e8f0;
+  --separator: #e8edf4;
+  --focus: #2563eb;
+  --link: #2563eb;
+
+  --field-background: #ffffff;
+  --field-foreground: #0f172a;
+  --field-placeholder: #64748b;
+  --field-border: #d0d7e2;
+  --field-border-width: 1px;
+  --field-radius: 0.75rem;
+  --field-hover: #f8fafc;
+  --field-focus: #ffffff;
+  --field-border-hover: #94a3b8;
+  --field-border-focus: #2563eb;
+
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+
+  --radius: 0.5rem;
+}
+
+/* Base — Tailwind utilities where possible */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ─── Simple utilities (no color-mix — avoids LightningCSS bad fallbacks) ─── */
+
+@utility bg-mesh {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(37 99 235 / 0.14), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgb(139 92 246 / 0.1), transparent),
+    radial-gradient(ellipse 50% 30% at 0% 100%, rgb(14 165 233 / 0.08), transparent);
+}
+
+@utility bg-grid {
+  background-image:
+    linear-gradient(rgb(15 23 42 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(15 23 42 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+@utility gradient-text {
+  background-image: linear-gradient(135deg, #0f172a 0%, #2563eb 50%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility btn-glow {
+  box-shadow:
+    0 0 0 1px rgb(37 99 235 / 0.15),
+    0 8px 24px rgb(37 99 235 / 0.2);
+}
+
+@utility card-premium {
+  border-radius: 1rem;
+  background-color: #ffffff;
+  box-shadow:
+    0 0 0 1px rgb(15 23 42 / 0.06),
+    0 12px 40px rgb(15 23 42 / 0.06);
+}
+
+@utility hero-enter {
+  animation: hero-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility hero-delay-1 {
+  animation-delay: 80ms;
+}
+
+@utility hero-delay-2 {
+  animation-delay: 160ms;
+}
+
+@utility hero-delay-3 {
+  animation-delay: 240ms;
+}
+
+@utility hero-delay-4 {
+  animation-delay: 320ms;
+}
+
+@utility landing-float {
+  animation: float-soft 10s ease-in-out infinite;
+}
+
+@utility duration-400 {
+  transition-duration: 400ms;
+}
+
+@utility ease-premium {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Nested rules as plain CSS (more reliable than nested @utility) */
+@layer components {
+  /* HeroUI Card defaults p-4 gap-3 — zero when card-premium */
+  .card.card-premium,
+  .card-premium.card {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* Form field padding for HeroUI inputs/selects */
+  .form-field .input,
+  .form-field .textarea,
+  .form-field [data-slot="input"],
+  .form-field [data-slot="textarea"] {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.625rem 0.875rem !important;
+  }
+
+  .form-field .textarea,
+  .form-field [data-slot="textarea"] {
+    min-height: 6.5rem;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+
+  .form-field .select__trigger,
+  .form-field [data-slot="trigger"] {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.875rem !important;
+  }
+
+  /* Compose textarea flush like X */
+  .x-compose-field .textarea,
+  .x-compose-field textarea,
+  .x-compose-field [data-slot="textarea"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: 7.5rem !important;
+    font-size: 1.25rem !important;
+    line-height: 1.5 !important;
+    border-radius: 0 !important;
+  }
+
+  .x-post-card {
+    font-family: var(--font-sans);
+  }
+}

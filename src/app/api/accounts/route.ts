@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { twitterAccounts } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { generatePKCEChallenge, getAuthorizationUrl } from "@/services/twitter/auth";
-
-const pendingVerifiers = new Map<string, PKCEChallenge>();
-
-interface PKCEChallenge {
-  verifier: string;
-  challenge: string;
-  state: string;
-}
+import { twitterAccounts, oauthStates, auditLogs } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import {
+  generatePKCEChallenge,
+  getAuthorizationUrl,
+} from "@/services/twitter/auth";
+import { ensureRedis } from "@/lib/redis";
 
 export async function GET() {
   try {
@@ -25,10 +21,12 @@ export async function GET() {
     }
 
     const accounts = await db.query.twitterAccounts.findMany({
-      where: eq(twitterAccounts.userId, session.user.id),
+      where: and(
+        eq(twitterAccounts.userId, session.user.id),
+        eq(twitterAccounts.isActive, true)
+      ),
     });
 
-    // Don't expose tokens to client
     const safeAccounts = accounts.map(
       ({ accessToken, refreshToken, ...rest }) => rest
     );
@@ -43,7 +41,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -53,12 +51,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    if (!process.env.X_CLIENT_ID || !process.env.X_REDIRECT_URI) {
+      return NextResponse.json(
+        { error: "X API credentials are not configured" },
+        { status: 503 }
+      );
+    }
+
     const { verifier, challenge, state } = generatePKCEChallenge();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Store verifier temporarily (in production, use Redis or session)
-    pendingVerifiers.set(state, { verifier, challenge, state });
+    // Prefer Redis; always persist to DB as durable fallback
+    try {
+      const r = await ensureRedis();
+      await r.set(
+        `oauth:pkce:${state}`,
+        JSON.stringify({ verifier, userId: session.user.id }),
+        "EX",
+        600
+      );
+    } catch {
+      // Redis optional for connect flow
+    }
 
-    const authUrl = getAuthorizationUrl(verifier, challenge, state);
+    await db.insert(oauthStates).values({
+      state,
+      userId: session.user.id,
+      verifier,
+      expiresAt,
+    });
+
+    const authUrl = getAuthorizationUrl(challenge, state);
 
     return NextResponse.json({ data: { authUrl, state } });
   } catch (error) {
@@ -80,8 +103,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const accountId = searchParams.get("id");
+    const accountId = new URL(request.url).searchParams.get("id");
 
     if (!accountId) {
       return NextResponse.json(
@@ -90,12 +112,27 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const existing = await db.query.twitterAccounts.findFirst({
+      where: and(
+        eq(twitterAccounts.id, accountId),
+        eq(twitterAccounts.userId, session.user.id)
+      ),
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
+    }
+
     await db
       .update(twitterAccounts)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(
-        eq(twitterAccounts.id, accountId)
-      );
+      .where(eq(twitterAccounts.id, accountId));
+
+    await db.insert(auditLogs).values({
+      userId: session.user.id,
+      action: "account.disconnect",
+      metadata: { accountId, username: existing.username },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

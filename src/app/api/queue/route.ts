@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { posts, postAccounts, twitterAccounts } from "@/db/schema";
-import { eq, and, or } from "drizzle-orm";
+import { posts, postAccounts } from "@/db/schema";
+import { eq, and, or, desc } from "drizzle-orm";
+import { enqueuePublish } from "@/jobs/queues";
 
 export async function GET() {
   try {
@@ -15,7 +16,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get posts that are scheduled or publishing
     const queuedPosts = await db.query.posts.findMany({
       where: and(
         eq(posts.userId, session.user.id),
@@ -25,10 +25,32 @@ export async function GET() {
           eq(posts.status, "failed")
         )
       ),
-      orderBy: [posts.scheduledAt],
+      with: {
+        postAccounts: {
+          with: {
+            twitterAccount: true,
+          },
+        },
+      },
+      orderBy: [desc(posts.scheduledAt), desc(posts.createdAt)],
     });
 
-    return NextResponse.json({ data: queuedPosts });
+    const sanitized = queuedPosts.map((p) => ({
+      ...p,
+      postAccounts: p.postAccounts?.map((pa) => ({
+        ...pa,
+        twitterAccount: pa.twitterAccount
+          ? {
+              id: pa.twitterAccount.id,
+              username: pa.twitterAccount.username,
+              displayName: pa.twitterAccount.displayName,
+              avatar: pa.twitterAccount.avatar,
+            }
+          : null,
+      })),
+    }));
+
+    return NextResponse.json({ data: sanitized });
   } catch (error) {
     console.error("Failed to fetch queue:", error);
     return NextResponse.json(
@@ -49,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { postId } = body;
+    const { postId } = body as { postId?: string };
 
     if (!postId) {
       return NextResponse.json(
@@ -58,7 +80,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify post belongs to user and is failed
     const post = await db.query.posts.findFirst({
       where: and(
         eq(posts.id, postId),
@@ -74,16 +95,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reset post and its accounts to pending
     await db
       .update(posts)
-      .set({ status: "scheduled", error: null, updatedAt: new Date() })
+      .set({
+        status: "publishing",
+        error: null,
+        updatedAt: new Date(),
+      })
       .where(eq(posts.id, postId));
 
     await db
       .update(postAccounts)
       .set({ status: "pending", error: null })
       .where(eq(postAccounts.postId, postId));
+
+    await enqueuePublish(postId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

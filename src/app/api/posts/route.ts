@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { posts, postAccounts } from "@/db/schema";
+import { posts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { postSchema } from "@/features/posts/schemas";
+import { createPost } from "@/services/post/create";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,22 +19,52 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
     const offset = (page - 1) * limit;
 
     const whereCondition = status
-      ? and(eq(posts.userId, session.user.id), eq(posts.status, status as any))
+      ? and(
+          eq(posts.userId, session.user.id),
+          eq(
+            posts.status,
+            status as "draft" | "scheduled" | "publishing" | "published" | "failed"
+          )
+        )
       : eq(posts.userId, session.user.id);
 
     const userPosts = await db.query.posts.findMany({
       where: whereCondition,
+      with: {
+        postAccounts: {
+          with: {
+            twitterAccount: true,
+          },
+        },
+      },
       orderBy: [desc(posts.createdAt)],
       limit,
       offset,
     });
 
-    return NextResponse.json({ data: userPosts });
+    // Strip tokens from nested accounts
+    const sanitized = userPosts.map((p) => ({
+      ...p,
+      postAccounts: p.postAccounts?.map((pa) => ({
+        ...pa,
+        twitterAccount: pa.twitterAccount
+          ? {
+              id: pa.twitterAccount.id,
+              username: pa.twitterAccount.username,
+              displayName: pa.twitterAccount.displayName,
+              avatar: pa.twitterAccount.avatar,
+              isActive: pa.twitterAccount.isActive,
+            }
+          : null,
+      })),
+    }));
+
+    return NextResponse.json({ data: sanitized });
   } catch (error) {
     console.error("Failed to fetch posts:", error);
     return NextResponse.json(
@@ -58,39 +89,26 @@ export async function POST(request: NextRequest) {
 
     if (!validated.success) {
       return NextResponse.json(
-        { error: validated.error.issues[0].message },
+        { error: validated.error.issues[0]?.message || "Invalid input" },
         { status: 400 }
       );
     }
 
-    const { content, accountIds, scheduledAt } = validated.data;
+    const { content, accountIds, scheduledAt, mode } = validated.data;
 
-    // Create the post
-    const [newPost] = await db
-      .insert(posts)
-      .values({
-        userId: session.user.id,
-        content,
-        status: scheduledAt ? "scheduled" : "draft",
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-      })
-      .returning();
-
-    // Create post_accounts entries
-    const postAccountEntries = accountIds.map((accountId) => ({
-      postId: newPost.id,
-      twitterAccountId: accountId,
-      status: "pending" as const,
-    }));
-
-    await db.insert(postAccounts).values(postAccountEntries);
+    const newPost = await createPost({
+      userId: session.user.id,
+      content,
+      accountIds,
+      scheduledAt: scheduledAt ?? null,
+      mode: mode ?? (scheduledAt ? "schedule" : "now"),
+    });
 
     return NextResponse.json({ data: newPost }, { status: 201 });
   } catch (error) {
     console.error("Failed to create post:", error);
-    return NextResponse.json(
-      { error: "Failed to create post" },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to create post";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

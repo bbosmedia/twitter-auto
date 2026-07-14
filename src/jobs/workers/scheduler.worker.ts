@@ -3,12 +3,11 @@ import { redis } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { posts } from "@/db/schema";
 import { eq, and, lte } from "drizzle-orm";
-import { publishQueue } from "../queues";
+import { enqueuePublish } from "../queues";
 
 export const schedulerWorker = new Worker(
   "scheduler",
   async () => {
-    // Find posts that are scheduled and due
     const duePosts = await db.query.posts.findMany({
       where: and(
         eq(posts.status, "scheduled"),
@@ -17,21 +16,12 @@ export const schedulerWorker = new Worker(
     });
 
     for (const post of duePosts) {
-      // Add to publish queue with retry
-      await publishQueue.add(
-        "publish",
-        { postId: post.id },
-        {
-          attempts: 3,
-          backoff: { type: "exponential", delay: 5000 },
-        }
-      );
-
-      // Update status
       await db
         .update(posts)
         .set({ status: "publishing", updatedAt: new Date() })
         .where(eq(posts.id, post.id));
+
+      await enqueuePublish(post.id);
     }
 
     return { processed: duePosts.length };
@@ -42,9 +32,10 @@ export const schedulerWorker = new Worker(
 );
 
 schedulerWorker.on("completed", (job) => {
-  console.log(`Scheduler processed ${job.returnvalue?.processed} posts`);
+  const n = job.returnvalue?.processed ?? 0;
+  if (n > 0) console.log(`[scheduler] enqueued ${n} due posts`);
 });
 
-schedulerWorker.on("failed", (job, err) => {
-  console.error("Scheduler failed:", err.message);
+schedulerWorker.on("failed", (_job, err) => {
+  console.error("[scheduler] failed:", err.message);
 });

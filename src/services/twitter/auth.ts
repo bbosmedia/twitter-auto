@@ -20,11 +20,7 @@ export function generatePKCEChallenge(): PKCEChallenge {
   return { verifier, challenge, state };
 }
 
-export function getAuthorizationUrl(
-  verifier: string,
-  challenge: string,
-  state: string
-): string {
+export function getAuthorizationUrl(challenge: string, state: string): string {
   const url = new URL(X_AUTH_URL);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("client_id", process.env.X_CLIENT_ID!);
@@ -60,7 +56,13 @@ export async function exchangeCodeForTokens(code: string, verifier: string) {
     throw new Error(`Failed to exchange code: ${error}`);
   }
 
-  return response.json();
+  return response.json() as Promise<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+    token_type: string;
+    scope: string;
+  }>;
 }
 
 export async function refreshAccessToken(refreshToken: string) {
@@ -84,5 +86,30 @@ export async function refreshAccessToken(refreshToken: string) {
     throw new Error("Failed to refresh access token");
   }
 
-  return response.json();
+  return response.json() as Promise<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  }>;
+}
+
+export async function fetchXUser(accessToken: string) {
+  const response = await fetch(
+    "https://api.x.com/2/users/me?user.fields=profile_image_url,name,username",
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch X user profile");
+  }
+
+  const json = await response.json();
+  return json.data as {
+    id: string;
+    name: string;
+    username: string;
+    profile_image_url?: string;
+  };
 }

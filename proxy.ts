@@ -1,32 +1,27 @@
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionCookie } from "better-auth/cookies";
 
-const PUBLIC_ROUTES = ["/login", "/register", "/forgot-password", "/"];
+const PUBLIC_ROUTES = ["/", "/login", "/register"];
 
-export async function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip static files and API routes
   if (
     pathname.startsWith("/_next") ||
-    pathname.includes("/api/") ||
+    pathname.startsWith("/api/") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // Allow public routes
   if (PUBLIC_ROUTES.includes(pathname)) {
     return NextResponse.next();
   }
 
-  // Full session validation for protected routes
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  // Optimistic cookie check (full validation happens in API routes / RSC)
+  const sessionCookie = getSessionCookie(request);
 
-  if (!session) {
+  if (!sessionCookie) {
     const signInUrl = new URL("/login", request.url);
     signInUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(signInUrl);

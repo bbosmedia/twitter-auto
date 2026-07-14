@@ -1,18 +1,22 @@
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
 
-export function formatDate(date: Date | string): string {
-  return format(new Date(date), "MMM d, yyyy");
+function toDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return isValid(value) ? value : null;
+  const d = parseISO(value);
+  if (isValid(d)) return d;
+  const fallback = new Date(value);
+  return isValid(fallback) ? fallback : null;
 }
 
-export function formatDateTime(date: Date | string): string {
-  return format(new Date(date), "MMM d, yyyy h:mm a");
+export function formatDateTime(value: string | Date | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return "—";
+  return format(d, "MMM d, yyyy · HH:mm");
 }
 
-export function formatRelativeTime(date: Date | string): string {
-  return formatDistanceToNow(new Date(date), { addSuffix: true });
-}
-
-export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + "...";
+export function formatRelative(value: string | Date | null | undefined): string {
+  const d = toDate(value);
+  if (!d) return "—";
+  return formatDistanceToNow(d, { addSuffix: true });
 }
