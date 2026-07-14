@@ -134,15 +134,16 @@ export function QueueList() {
                     {post.error && (
                       <p className="mt-2 text-xs text-danger">{post.error}</p>
                     )}
-                    <button
-                      type="button"
-                      className="mt-2 text-xs font-medium text-sky-600 hover:underline"
-                      onClick={() =>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-2 h-auto px-0 text-xs font-medium text-accent"
+                      onPress={() =>
                         setExpandedId(isOpen ? null : post.id)
                       }
                     >
                       {isOpen ? "Hide X preview" : "Show X preview"}
-                    </button>
+                    </Button>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     {post.status === "failed" && (

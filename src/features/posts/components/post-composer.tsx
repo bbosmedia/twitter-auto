@@ -13,8 +13,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import {
   Alert,
+  Avatar,
   Button,
   Card,
+  Chip,
   FieldError,
   Label,
   Separator,
@@ -168,20 +170,19 @@ export function PostComposer({
           {/* X-like compose row */}
           <div className="flex gap-3 px-5 pt-5 sm:px-6">
             <div className="shrink-0">
-              {selectedAccountObjects[0]?.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={selectedAccountObjects[0].avatar}
-                  alt=""
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-blue-600 text-sm font-bold text-white">
+              <Avatar>
+                {selectedAccountObjects[0]?.avatar ? (
+                  <Avatar.Image
+                    src={selectedAccountObjects[0].avatar}
+                    alt=""
+                  />
+                ) : null}
+                <Avatar.Fallback>
                   {(
                     selectedAccountObjects[0]?.username?.[0] || "P"
                   ).toUpperCase()}
-                </div>
-              )}
+                </Avatar.Fallback>
+              </Avatar>
             </div>
 
             <div className="min-w-0 flex-1">
@@ -214,29 +215,23 @@ export function PostComposer({
               />
 
               {/* X toolbar strip */}
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-0.5 text-sky-500">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+                <div className="flex items-center gap-0.5 text-accent">
                   {[ImageIcon, ListOrdered, Smile, CalendarClock, MapPin].map(
                     (Icon, i) => (
-                      <button
+                      <Button
                         key={i}
-                        type="button"
-                        tabIndex={-1}
-                        className={cn(
-                          "rounded-full p-2 transition hover:bg-sky-50",
-                          i === 3 && scheduleMode && "bg-sky-50"
-                        )}
-                        onClick={() => {
+                        isIconOnly
+                        size="sm"
+                        variant={i === 3 && scheduleMode ? "secondary" : "ghost"}
+                        className="text-accent"
+                        aria-label={i === 3 ? "Schedule" : "Coming soon"}
+                        onPress={() => {
                           if (i === 3) setScheduleMode((v) => !v);
                         }}
-                        title={
-                          i === 3
-                            ? "Schedule"
-                            : "Coming soon"
-                        }
                       >
                         <Icon size={18} />
-                      </button>
+                      </Button>
                     )
                   )}
                 </div>
@@ -405,13 +400,13 @@ export function PostComposer({
             </p>
           </div>
           {scheduleMode && scheduledAt ? (
-            <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+            <Chip size="sm" color="accent" variant="soft">
               Scheduled
-            </span>
+            </Chip>
           ) : (
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+            <Chip size="sm" variant="soft">
               Post now
-            </span>
+            </Chip>
           )}
         </div>
 

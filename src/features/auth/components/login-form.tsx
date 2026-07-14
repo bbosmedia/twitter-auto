@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
+  Alert,
   Button,
   Card,
   Separator,
@@ -48,9 +49,12 @@ export function LoginForm() {
 
       <Card.Content className="flex flex-col gap-3 px-6 pb-8 pt-2 sm:px-8">
         {error && (
-          <div className="rounded-xl border border-danger/25 bg-danger/5 px-3 py-2 text-sm text-danger">
-            {error}
-          </div>
+          <Alert status="danger">
+            <Alert.Content>
+              <Alert.Title>Sign-in failed</Alert.Title>
+              <Alert.Description>{error}</Alert.Description>
+            </Alert.Content>
+          </Alert>
         )}
 
         <Button

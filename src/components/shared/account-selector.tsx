@@ -4,12 +4,13 @@ import {
   Avatar,
   Button,
   Description,
+  EmptyState,
   FieldError,
   Label,
   ListBox,
   Select,
 } from "@heroui/react";
-import Link from "next/link";
+import { LinkButton } from "@/components/shared/link-button";
 
 export type SelectableAccount = {
   id: string;
@@ -34,12 +35,12 @@ export function AccountSelector({
 }) {
   if (!accounts.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-surface/40 px-4 py-6 text-center text-sm text-muted">
-        No active X accounts.{" "}
-        <Link href="/accounts" className="text-accent hover:underline">
+      <EmptyState className="rounded-xl border border-dashed border-border bg-surface-secondary/40 px-4 py-6 text-center">
+        <p className="text-sm text-muted">No active X accounts yet.</p>
+        <LinkButton href="/accounts" size="sm" className="mt-3">
           Connect one
-        </Link>
-      </div>
+        </LinkButton>
+      </EmptyState>
     );
   }
 

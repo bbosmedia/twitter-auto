@@ -4,10 +4,16 @@ import { LogOut, User, Settings, Menu } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import { useRouter, usePathname } from "next/navigation";
 import { useSession } from "@/hooks/use-session";
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { Avatar, Button, Separator } from "@heroui/react";
-import { cn } from "@/utils/cn";
+import { useState } from "react";
+import {
+  Avatar,
+  Button,
+  Dropdown,
+  Label,
+  Separator,
+} from "@heroui/react";
+import { cn } from "@/lib/cn";
+import { LinkButton } from "@/components/shared/link-button";
 
 const titles: Record<string, string> = {
   "/dashboard": "Overview",
@@ -31,24 +37,12 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const { session } = useSession();
-  const [showMenu, setShowMenu] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const title =
     titles[pathname] ||
     Object.entries(titles).find(([k]) => pathname.startsWith(k))?.[1] ||
     "Pulse";
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -76,12 +70,8 @@ export function Header() {
         </div>
       </div>
 
-      <div className="relative" ref={menuRef}>
-        <Button
-          variant="secondary"
-          className="h-auto gap-2 px-2 py-1.5"
-          onPress={() => setShowMenu((v) => !v)}
-        >
+      <Dropdown>
+        <Button variant="secondary" className="h-auto gap-2 px-2 py-1.5">
           <Avatar size="sm">
             {session?.user?.image ? (
               <Avatar.Image src={session.user.image} alt="" />
@@ -90,70 +80,56 @@ export function Header() {
               {session?.user?.name?.[0]?.toUpperCase() || "U"}
             </Avatar.Fallback>
           </Avatar>
-          <div className="hidden text-left sm:block pr-1">
+          <div className="hidden pr-1 text-left sm:block">
             <p className="text-xs font-medium leading-none">
               {session?.user?.name || "User"}
             </p>
-            <p className="mt-1 text-[10px] text-muted leading-none">
+            <p className="mt-1 text-[10px] leading-none text-muted">
               {session?.user?.email}
             </p>
           </div>
         </Button>
-
-        {showMenu && (
-          <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
-            <Button
-              variant="ghost"
-              fullWidth
-              className="justify-start rounded-none"
-              onPress={() => {
-                router.push("/profile");
-                setShowMenu(false);
-              }}
-            >
-              <User size={15} /> Profile
-            </Button>
-            <Button
-              variant="ghost"
-              fullWidth
-              className="justify-start rounded-none"
-              onPress={() => {
-                router.push("/settings");
-                setShowMenu(false);
-              }}
-            >
-              <Settings size={15} /> Settings
-            </Button>
+        <Dropdown.Popover placement="bottom end" className="min-w-48">
+          <Dropdown.Menu
+            onAction={(key) => {
+              if (key === "profile") router.push("/profile");
+              if (key === "settings") router.push("/settings");
+              if (key === "logout") void handleSignOut();
+            }}
+          >
+            <Dropdown.Item id="profile" textValue="Profile">
+              <User size={15} />
+              <Label>Profile</Label>
+            </Dropdown.Item>
+            <Dropdown.Item id="settings" textValue="Settings">
+              <Settings size={15} />
+              <Label>Settings</Label>
+            </Dropdown.Item>
             <Separator />
-            <Button
-              variant="danger-soft"
-              fullWidth
-              className="justify-start rounded-none"
-              onPress={handleSignOut}
-            >
-              <LogOut size={15} /> Sign out
-            </Button>
-          </div>
-        )}
-      </div>
+            <Dropdown.Item id="logout" textValue="Sign out" variant="danger">
+              <LogOut size={15} />
+              <Label>Sign out</Label>
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
 
       {mobileOpen && (
         <div className="absolute left-0 right-0 top-16 border-b border-border bg-surface p-3 md:hidden">
           <div className="flex flex-col gap-1">
             {mobileNav.map((item) => (
-              <Link
+              <LinkButton
                 key={item.href}
                 href={item.href}
-                onClick={() => setMobileOpen(false)}
+                variant={pathname === item.href ? "secondary" : "ghost"}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm",
-                  pathname === item.href
-                    ? "bg-accent/15 text-accent"
-                    : "text-muted"
+                  "w-full justify-start",
+                  pathname === item.href && "text-accent"
                 )}
+                onPress={() => setMobileOpen(false)}
               >
                 {item.label}
-              </Link>
+              </LinkButton>
             ))}
           </div>
         </div>

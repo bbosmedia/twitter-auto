@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   PenSquare,
@@ -12,7 +11,8 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
-import { cn } from "@/utils/cn";
+import { Button, Card, Chip } from "@heroui/react";
+import { cn } from "@/lib/cn";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -26,11 +26,12 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-white md:flex">
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
       <div className="flex h-16 items-center gap-2.5 border-b border-border px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/20 text-accent">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <Sparkles size={16} />
         </div>
         <div>
@@ -46,30 +47,38 @@ export function Sidebar() {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
           return (
-            <Link
+            <Button
               key={item.href}
-              href={item.href}
+              variant={isActive ? "secondary" : "ghost"}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-accent/15 text-accent"
-                  : "text-muted hover:bg-surface-3 hover:text-foreground"
+                "w-full justify-start gap-3",
+                isActive && "bg-accent/15 text-accent"
               )}
+              onPress={() => router.push(item.href)}
             >
               <item.icon size={17} />
               {item.label}
-            </Link>
+            </Button>
           );
         })}
       </nav>
 
       <div className="border-t border-border p-4">
-        <div className="rounded-xl border border-border bg-surface-2 p-3">
-          <p className="text-xs font-semibold text-foreground">Full access</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted">
-            All features unlocked. No subscription tiers.
-          </p>
-        </div>
+        <Card className="card-premium border border-border">
+          <Card.Content className="gap-2 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-foreground">
+                Full access
+              </p>
+              <Chip size="sm" color="success" variant="soft">
+                Free
+              </Chip>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">
+              All features unlocked. No subscription tiers.
+            </p>
+          </Card.Content>
+        </Card>
       </div>
     </aside>
   );
